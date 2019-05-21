@@ -41,6 +41,34 @@ public void Main(string argument, UpdateType updateSource) {
 
 
 
+//
+// Returns a Dictionary with all the cargo items in the grid
+//
+public Dictionary<string, int> GetAllCargo(IMyGridTerminalSystem gts) {
+    Dictionary<string, int> res = new Dictionary<string, int>();
+
+    //
+    // Get a list of all containers in the grid
+    //
+    List<IMyCargoContainer> containers = new List<IMyCargoContainer>();
+    gts.GetBlocksOfType<IMyCargoContainer>(containers);
+
+    foreach (IMyCargoContainer container in containers) {
+        var items = container.GetInventory(0).GetItems();
+        foreach (var item in items) {
+            string k = item.Content.TypeId.ToString();
+            if (!res.ContainsKey(k)) 
+                res.Add(k, 0);
+            res[k] = res[k] + item.Amount;
+        }
+    }  
+
+    return res;
+}
+
+
+
+
 private static string PadLeft(string s, int width) {
     if (s.Length>= width)
         return s;
