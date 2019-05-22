@@ -39,8 +39,8 @@ private Dictionary<IMyTextPanel, OutputPanel> panels = new Dictionary<IMyTextPan
 
 public void Main(string argument, UpdateType updateSource) {
     if (updateTimer-- <= 0) {
-        updateTimer = UPDATE_PERIOD;        
-        UpdateScreens(GridTerminalSystem);        
+        updateTimer = UPDATE_PERIOD;
+        UpdateScreens(GridTerminalSystem);
     }
 }
 
@@ -108,6 +108,23 @@ public Dictionary<string, int> GetAllCargo(IMyGridTerminalSystem gts) {
     gts.GetBlocksOfType<IMyEntity>(containers);
 
     foreach (IMyEntity container in containers) {
+
+        //
+        // Handle gas containers
+        //
+        if (container is IMyGasTank) {
+            IMyGasTank tank = (IMyGasTank)container;
+            string k = "O2";
+            if (tank.BlockDefinition.SubtypeId.Contains("Hydrogen")) 
+                k = "H2";
+            if (!res.ContainsKey("GAS_" + k)) {
+                res.Add("GAS_" + k, 0);
+                res.Add("GAS_MAX_" + k, 0);
+            }
+            res["GAS_" + k] = res["GAS_" + k] + (int)(tank.Capacity * tank.FilledRatio);
+            res["GAS_MAX_" + k] = res["GAS_MAX_" + k] + (int)tank.Capacity;
+        }
+
         if (container.InventoryCount == 0)
             continue;
         for (int j = 0; j < container.InventoryCount; ++j) {
@@ -184,6 +201,7 @@ public class ScreenThing {
             switch (t) {
                 case "mass": el = new ScreenElementMass(this); break;
                 case "item": el = new ScreenElementItemCount(this); break;
+                case "gas":  el = new ScreenElementGas(this); break;
                 default: throw new InvalidOperationException("Unknown element type: " + t);
             }
             el.Parse(s);
@@ -257,7 +275,7 @@ public class ScreenElementMass : ScreenElement {
     private int vPadWidth = -1;
     private bool vDry = false;
 
-    public ScreenElementMass(ScreenThing owner) : base(owner) {						
+    public ScreenElementMass(ScreenThing owner) : base(owner) {
     }
 
     public override void Parse(string data) {
@@ -291,13 +309,60 @@ public class ScreenElementItemCount : ScreenElement {
             vPadWidth = int.Parse(bits[1]);
     }
 
-    public override string Get(Dictionary<string, int> storage) {        
+    public override string Get(Dictionary<string, int> storage) {
         int m;
         string s;
         if (!storage.TryGetValue(vResource, out m)) 
             s = "-";
         else 
-            s = m > 1000 ? (int)(m / 1000) + "K" : m.ToString();							
+            s = m > 1000 ? (int)(m / 1000) + "K" : m.ToString();
+        if (vPadWidth <= 0)
+            return s;
+        return PadLeft(s, vPadWidth);
+    }
+}
+
+
+// <gas:o2,pad,%>
+public class ScreenElementGas : ScreenElement {
+    private string vResource; // o2 or h2
+    private bool absolute = true; // absolute or %age?
+    private int vPadWidth = -1;
+
+    public ScreenElementGas(ScreenThing owner) : base(owner) {
+    }
+
+    public override void Parse(string data) {
+        string[] bits = data.Split(',');
+        vResource = bits[0].ToUpper();
+        if ("O2".Equals(vResource) || "H2".Equals(vResource)) {
+        } else
+            throw new InvalidOperationException("Resource type must be O2 or H2");
+        if (bits.Length > 1)
+            vPadWidth = int.Parse(bits[1]);
+        if (bits.Length > 2) 
+            absolute = !"%".Equals(bits[2]);
+    }
+
+    public override string Get(Dictionary<string, int> storage) {
+        int m;
+        string s;
+        if (absolute) {
+            if (!storage.TryGetValue("GAS_" + vResource, out m)) 
+                s = "-";
+            else 
+                s = m > 1000 ? (int)(m / 1000) + "K" : m.ToString();
+        } else {
+            if (!storage.TryGetValue("GAS_" + vResource, out m)) 
+                s = "0";
+            else  {
+                int max = storage["GAS_MAX_" + vResource];
+                if (max == 0)
+                    max = 1;
+                s = ((int)((m * 100) / max)).ToString();
+            }
+        }
+
         if (vPadWidth <= 0)
             return s;
         return PadLeft(s, vPadWidth);
