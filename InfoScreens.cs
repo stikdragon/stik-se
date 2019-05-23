@@ -210,10 +210,15 @@ public class ScreenThing {
     }
 
     public string Evaluate(Dictionary<string, int> cargo) {
-        StringBuilder sb = new StringBuilder();
-        foreach (ScreenElement e in elements) 
-            sb.Append(e.Get(cargo));		
-        return sb.ToString();
+        try {
+            StringBuilder sb = new StringBuilder();
+            foreach (ScreenElement e in elements) 
+                sb.Append(e.Get(cargo));		
+            return sb.ToString();        
+        } catch (Exception ex) {
+            return ex.ToString();
+        }
+
     }
 
     public static ScreenThing Parse(IMyGridTerminalSystem gts, String input) {
@@ -359,7 +364,7 @@ public class ScreenElementGas : ScreenElement {
                 int max = storage["GAS_MAX_" + vResource];
                 if (max == 0)
                     max = 1;
-                s = ((int)((m * 100) / max)).ToString();
+                s = ((int)((double)m * 100.0 / max)).ToString();
             }
         }
 
